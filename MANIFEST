@@ -1,0 +1,7 @@
+MANIFEST
+CHANGELOG
+README
+Makefile.PL
+lib/oob.pm
+t/oob01.t
+META.yml                                 Module meta-data (added by MakeMaker)

@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 # version
-our $VERSION = '0.01';
+$oob::VERSION = '0.02';
 
 # modules that we need
 use Carp qw( croak );
@@ -330,7 +330,7 @@ oob - out of bounds data for any data structure in Perl
 
 =head1 VERSION
 
-This documentation describes version 0.01.
+This documentation describes version 0.02.
 
 =head1 SYNOPSIS
 

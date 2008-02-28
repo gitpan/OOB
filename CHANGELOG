@@ -1,2 +1,6 @@
+0.02	28 February 2008
+	Removed "our" from $VERSION to get a clean compile on 5.005005,
+	reported by srezic@cpan.org.
+
 0.01	27 February 2008
 	First version of oob.

@@ -9,5 +9,6 @@ WriteMakefile (
  VERSION_FROM	=> 'lib/OOB.pm',
  PREREQ_PM	=> { qw(
                     Scalar::Util  1.14
+                    Sub::Identify 0.02
                    ) },
 );

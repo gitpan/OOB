@@ -1,3 +1,6 @@
+0.06	29 February 2008
+	Now requires Sub::Identify as a prerequisite.
+
 0.05	29 February 2008
 	Added many more tests.
 

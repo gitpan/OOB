@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 # version
-$OOB::VERSION = '0.05';
+$OOB::VERSION = '0.06';
 
 # modules that we need
 use Carp qw( croak );
@@ -386,7 +386,7 @@ OOB - out of band data for any data structure in Perl
 
 =head1 VERSION
 
-This documentation describes version 0.05.
+This documentation describes version 0.06.
 
 =head1 SYNOPSIS
 
@@ -535,6 +535,7 @@ C<blessed> function, as well as the core C<ref> function.
 =head1 REQUIRED MODULES
 
  Scalar::Util (1.14)
+ Sub::Identify (0.02)
 
 =head1 AUTHOR
 

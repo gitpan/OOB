@@ -5,10 +5,11 @@ to any Perl data structure with both a functional and an object oriented
 interface.
 
 Version:
- 0.05
+ 0.06
 
 Required Modules:
  Scalar::Util (1.14)
+ Sub::Identify (0.02)
 
 The build is standard:
 

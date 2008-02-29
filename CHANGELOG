@@ -1,3 +1,10 @@
+0.04	29 February 2008
+	Removed use of prototypes altogether, so that we're not hindered by
+	older, more limited, prototype capabilities of Perl before 5.8.0.
+
+	Dave Rolsky pointed out I meant "out-of-band" rather than
+	"out-of-bounds".  Documentation adapted accordingly.
+
 0.03	29 February 2008
 	Renamed to OOB, at the suggestion of abeltje.
 

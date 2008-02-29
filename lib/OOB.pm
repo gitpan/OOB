@@ -5,13 +5,13 @@ use strict;
 use warnings;
 
 # version
-$OOB::VERSION = '0.03';
+$OOB::VERSION = '0.04';
 
 # modules that we need
 use Carp qw( croak );
 use Scalar::Util qw( blessed refaddr reftype );
 
-# what we may axport
+# what we may export
 my %export_ok;
 @export_ok{ qw(
   OOB_get
@@ -19,7 +19,7 @@ my %export_ok;
   OOB_set
 ) } = ();
 
-# the actual out-of-bounds data
+# the actual out-of-band data
 my %data;
 
 # coderefs of stolen DESTROY methods by class
@@ -66,7 +66,7 @@ END {
 #      3 package in which key lives (optional)
 # OUT: 1 value or undef
 
-sub OOB_get (\[$@%&*]$@) {
+sub OOB_get {
 
     # we're debugging
     if ( DEBUG > 1 ) {
@@ -90,7 +90,7 @@ sub OOB_get (\[$@%&*]$@) {
 #      2 package in which key lives (optional)
 # OUT: 1 hash ref with all values
 
-sub OOB_reset (\[$@%&*]@) {
+sub OOB_reset {
 
     # we're debugging
     if ( DEBUG > 1 ) {
@@ -110,7 +110,7 @@ sub OOB_reset (\[$@%&*]@) {
 #      4 package in which key lives (optional)
 # OUT: 1 any old value
 
-sub OOB_set (\[$@%&*]$$@) {
+sub OOB_set {
 
     # scalar specified
     if ( !reftype $_[0] ) {
@@ -326,11 +326,11 @@ __END__
 
 =head1 NAME
 
-OOB - out of bounds data for any data structure in Perl
+OOB - out of band data for any data structure in Perl
 
 =head1 VERSION
 
-This documentation describes version 0.03.
+This documentation describes version 0.04.
 
 =head1 SYNOPSIS
 
@@ -371,17 +371,17 @@ This documentation describes version 0.03.
 
  package Foo;
  OOB_set( $scalar, key => $value );
- my $value = OOB_get( @array, 'key' );
- OOB_reset( %hash );
+ my $value = OOB_get( \@array, 'key' );
+ OOB_reset( \%hash );
 
  package Bar;
  my $value = OOB_get( $arrayref, 'key', 'Foo' ); # other module's namespace
 
 =head1 DESCRIPTION
 
-This module makes it possible to assign any out of bounds data (attributes)
+This module makes it possible to assign any out of band data (attributes)
 to any Perl data structure with both a functional and an object oriented
-interface.  Out of bounds data is basically represented by a key / value pair.
+interface.  Out of band data is basically represented by a key / value pair.
 
 =head2 Object Oriented Interface
 
@@ -410,10 +410,9 @@ After that, you can use that attribute on any Perl data structure:
 =head2 Functional Interface
 
 The functional interface gives more flexibility but may not be as easy to
-type.  It basically allows you to specify arrays, hashes and subs directly
-(courtesy of Perl's prototyping feature).  The functional interface is in
-principle limited to the namespace from which it is being called, but can
-be overridden if necessary.
+type.  The functional interface binds the given attribut names to thei
+namespace from which it is being called (but this can be overridden if
+necessary).
 
  use OOB qw( OOB_set OOB_get OOB_reset ); # nothing exported by default
 
@@ -425,12 +424,13 @@ be overridden if necessary.
  my $type = OOB_get( $string, ContentType => 'Foo' ); # other namespace
  OOB_set( $string, ContentType => "text/$type" );     # attribute in "Bar"
 
- OOB_set( $string, ContentType => 'text/html' ); # equivalent to object
- OOB_set( @array,  ContentType => 'text/html' ); # oriented examples, but
- OOB_set( %hash,   ContentType => 'text/html' ); # limited to the current
- OOB_set( &sub,    ContentType => 'text/html' ); # namespace
- OOB_set( *FILE,   ContentType => 'text/html' );
- OOB_set( $handle, ContentType => 'text/html' );
+ OOB_set( $string, ContentType => 'text/html' );  # scalars don't need refs,
+ OOB_set( \$string, ContentType => 'text/html' ); # equivalent to object
+ OOB_set( \@array,  ContentType => 'text/html' ); # oriented examples, but
+ OOB_set( \%hash,   ContentType => 'text/html' ); # limited to the current
+ OOB_set( \&sub,    ContentType => 'text/html' ); # namespace
+ OOB_set( \*FILE,   ContentType => 'text/html' );
+ OOB_set( \$handle, ContentType => 'text/html' );
 
 =head1 THEORY OF OPERATION
 
@@ -447,7 +447,7 @@ module is also installed.  If that module cannot be found, a warning will
 be issued once to indicate that no cleanup can be performed for blessed
 objects, and execution will then continue as normal.
 
-To prevent clashes between different modules use of the out-of-bounds data,
+To prevent clashes between different modules use of the out-of-band data,
 the package name of the caller is automatically added to any key specified,
 thereby giving each package its own namespace in the C<OOB> environment.
 However, if need be, a module can access data from another package by the
@@ -474,12 +474,13 @@ Juerd Waalboer for the insight that you don't need to keep a reference on
 a blessed Perl data structure such as a scalar, array or hash, but instead
 can use B<any> reference to that data structure to find out its blessedness.
 
+Dave Rolsky for pointing out I meant "out-of-band" data, rather than
+"out-of-bounds".  Oops!
+
 =head1 COPYRIGHT
 
 Copyright (c) 2008 Elizabeth Mattijsen <liz@dijkmat.nl>. All rights
 reserved.  This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
-
-=head1 SEE ALSO
 
 =cut

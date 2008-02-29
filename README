@@ -5,7 +5,7 @@ to any Perl data structure with both a functional and an object oriented
 interface.
 
 Version:
- 0.04
+ 0.05
 
 Required Modules:
  Scalar::Util (1.14)

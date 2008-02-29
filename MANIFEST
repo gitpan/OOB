@@ -3,5 +3,8 @@ CHANGELOG
 README
 Makefile.PL
 lib/OOB.pm
-t/OOB01.t
+t/001basic.t
+t/010cloak.t
+t/020object.t
+t/030function.t
 META.yml                                 Module meta-data (added by MakeMaker)

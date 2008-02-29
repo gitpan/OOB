@@ -5,11 +5,61 @@ use strict;
 use warnings;
 
 # version
-$OOB::VERSION = '0.04';
+$OOB::VERSION = '0.05';
 
 # modules that we need
 use Carp qw( croak );
 use Scalar::Util qw( blessed refaddr reftype );
+
+# the actual out-of-band data
+my %data;
+
+# set DEBUG constant if appropriate
+BEGIN {
+    my $debug = 0 + ( $ENV{OOB_DEBUG} || 0 );
+    eval "sub DEBUG () { $debug }";
+
+    # we're debugging
+    if ($debug) {
+        print STDERR "OOB debugging enabled\n";
+
+        # create OOB::dump
+        no warnings 'once';
+        *dump = sub {
+            require Data::Dumper;
+            if ( defined wantarray ) {
+                return wantarray ? %data : \%data;
+            }
+            print STDERR Data::Dumper::Dumper( \%data );
+        }
+    }
+}    #BEGIN
+
+# install cloaking functions
+BEGIN {
+    no warnings 'redefine';
+
+    # cloak ourselves from "blessed"
+    *Scalar::Util::blessed = sub ($) {
+        my $blessed = blessed $_[0];
+        return if !$blessed;
+        return $blessed->isa(__PACKAGE__) ? undef : $blessed;
+    };
+
+    # determine whether someone else already stole ref()
+    my $old = \&CORE::GLOBAL::ref;
+    eval {$old->()};
+    $old = undef if $@ =~ m#CORE::GLOBAL::ref#;
+    print STDERR "CORE::ref function was already stolen\n"
+      if DEBUG and $old;
+
+    # cloak ourselves from "ref"
+    *CORE::GLOBAL::ref = sub {
+        my $blessed = blessed $_[0];
+        return reftype $_[0] if $blessed and $blessed->isa(__PACKAGE__);
+        return $old ? $old->( $_[0] ) : CORE::ref $_[0];
+    };
+}    #BEGIN
 
 # what we may export
 my %export_ok;
@@ -19,28 +69,9 @@ my %export_ok;
   OOB_set
 ) } = ();
 
-# the actual out-of-band data
-my %data;
-
 # coderefs of stolen DESTROY methods by class
 my $can_identify;
-my %stolen = ( __PACKAGE__ => \&DESTROY );
-
-# set DEBUG constant if appropriate
-BEGIN {
-    my $debug = 0 + ( $ENV{OOB_DEBUG} || 0 );
-    eval "sub DEBUG () { $debug }";
-
-    # create OOB::dump
-    no warnings 'once';
-    *dump = sub {
-        require Data::Dumper;
-        if ( defined wantarray ) {
-            return wantarray ? %data : \%data;
-        }
-        print STDERR Data::Dumper::Dumper( \%data );
-    } if $debug;
-}    #BEGIN
+my %stolen = ( __PACKAGE__ . '' => \&DESTROY );
 
 # enable final debugger if necessary
 END {
@@ -134,10 +165,20 @@ TEXT
 
             # remember current DESTROY logic and put in our own in there
             if ($can_identify) {
-                my $destroy  = $stolen{$blessed} = $blessed->can('DESTROY');
-                my $fullname = Sub::Identify::sub_fullname($destroy);
-                no strict 'refs';
-                *$fullname = sub { $destroy->( $_[0] ); &DESTROY( $_[0] ) };
+                my $destroy = $stolen{$blessed} = $blessed->can('DESTROY');
+
+                # there is a DESTROY method, need to insert ours
+                if ($destroy) {
+                    my $fullname = Sub::Identify::sub_fullname($destroy);
+                    no strict 'refs';
+                    *$fullname = sub { $destroy->( $_[0] ); &DESTROY( $_[0] ) };
+                }
+
+                # no DESTROY method yet, to set one
+                else {
+                    no strict 'refs';
+                    *{ $blessed . '::DESTROY' } = $stolen{$blessed} = \&DESTROY;
+                }
             }
         }
     }
@@ -179,12 +220,12 @@ TEXT
 # Export any constants requested
 #
 #  IN: 1 class (ignored)
-#      2..N constants to be exported
+#      2..N constants to be exported / attributes to be defined
 
 sub import {
-    shift;
+    my $class = shift;
 
-    # nothing to export
+    # nothing to export / defined
     if (!@_) {
         return;
     }
@@ -194,9 +235,12 @@ sub import {
         @_ = keys %export_ok;
     }
 
-    # something we don't know how to handle
-    elsif ( my @huh = grep { !exists $export_ok{$_} } @_ ) {
-        croak "Don't know what to do with: @huh";
+    # assume none exportables are attributes
+    elsif ( my @attributes = grep { !exists $export_ok{$_} } @_ ) {
+        _register( $class, $_ ) foreach @attributes;
+
+        # reduce to real exportables
+        @_ = grep { exists $export_ok{$_} } @_;
     }
 
     # determine namespace to export to
@@ -238,16 +282,7 @@ sub AUTOLOAD {
 
     # registration
     elsif ( !@_ ) {
-        my ( $namespace, $key ) = split '::', $OOB::AUTOLOAD;
-
-        # install a method to handle it
-        no strict 'refs';
-        *$OOB::AUTOLOAD = sub {
-            return if @_ < 2; # another registration and huh?
-            return @_ == 3
-             ? OOB_set( $_[1], $key => $_[2], $namespace )
-             : OOB_get( $_[1], $key, $namespace );
-        };
+        _register( $OOB::AUTOLOAD =~ m#^(.*)::(\w+)$# );
     }
 
     return;
@@ -293,6 +328,27 @@ sub _generate_key {
 }    #_generate_key
 
 #-------------------------------------------------------------------------------
+# _register
+#
+# Register a new class method
+#
+#  IN: 1 namespace
+#      2 key
+
+sub _register {
+    my ( $namespace, $key ) = @_;
+
+    # install a method to handle it
+    no strict 'refs';
+    *{ $namespace . '::' . $key } = sub {
+        return if @_ < 2; # another registration and huh?
+        return @_ == 3
+         ? OOB_set( $_[1], $key => $_[2], $namespace )
+         : OOB_get( $_[1], $key, $namespace );
+    };
+}    #_register
+
+#-------------------------------------------------------------------------------
 # _unique_id
 #
 # Return the key of the given parameters
@@ -330,7 +386,7 @@ OOB - out of band data for any data structure in Perl
 
 =head1 VERSION
 
-This documentation describes version 0.04.
+This documentation describes version 0.05.
 
 =head1 SYNOPSIS
 
@@ -338,10 +394,15 @@ This documentation describes version 0.04.
  use OOB;
 
  # register attributes
+ use OOB qw( ContentType EpochStart Currency Accept );
+
+ or:
+
  OOB->ContentType;
  OOB->EpochStart;
  OOB->Currency;
  OOB->Accept;
+ OOB->Filename;
 
  # scalars (or scalar refs)
  OOB->ContentType( $message, 'text/html' );
@@ -365,6 +426,10 @@ This documentation describes version 0.04.
  # subroutines
  OOB->Accept( \&frobnicate, \@classes );
  my $classes = OOB->Accept( \&frobnicate );
+
+ # blessed objects
+ OOB->Filename( $handle, $filename );
+ my $filename = OOB->Filename($handle);
 
  # functional interface
  use OOB qw( OOB_set OOB_get OOB_reset );
@@ -391,11 +456,16 @@ you need to register a new attribute at least once before being able to set
 it.  Attempting to access any non-existing meta-data attributes will B<not>
 result in an error, but simply return undef.
 
-Registration of an attribute is simple: just calling it as a class method on
-the C<OOB> module is enough:
+Registration of an attribute is simple. Either you specify its name when
+you use the C<OOB> module, at compile time:
+
+ use OOB qw( ContentType );
+
+Just calling it as a class method on the C<OOB> module at runtime is also
+enough to allow the attribute:
 
  use OOB;
- OOB->ContentType;
+ OOB->ContentType; # much later
 
 After that, you can use that attribute on any Perl data structure:
 
@@ -424,7 +494,7 @@ necessary).
  my $type = OOB_get( $string, ContentType => 'Foo' ); # other namespace
  OOB_set( $string, ContentType => "text/$type" );     # attribute in "Bar"
 
- OOB_set( $string, ContentType => 'text/html' );  # scalars don't need refs,
+ OOB_set( $string,  ContentType => 'text/html' ); # scalars don't need refs,
  OOB_set( \$string, ContentType => 'text/html' ); # equivalent to object
  OOB_set( \@array,  ContentType => 'text/html' ); # oriented examples, but
  OOB_set( \%hash,   ContentType => 'text/html' ); # limited to the current
@@ -457,6 +527,10 @@ The object oriented interface is really nothing more than synctactic sugar
 on top of the functional interface.  The namespace that is being used by all
 of the attributes specified with the object oriented interface is the C<OOB>
 package itself.
+
+To hide the fact that Perl data structures have suddenly become blessed,
+the C<OOB> module cloaks itself from being seen by L<Scalar::Util>'s
+C<blessed> function, as well as the core C<ref> function.
 
 =head1 REQUIRED MODULES
 

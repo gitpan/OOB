@@ -1,3 +1,13 @@
+0.05	29 February 2008
+	Added many more tests.
+
+	Can now also specify allowable attributes at compile time with
+	parameters to "use".
+
+	Now cloaks OOB from ref() and Scalar::Util::blessed(), so that
+	checks on the refs don't suddenly change behaviour because an
+	attribute has been added.
+
 0.04	29 February 2008
 	Removed use of prototypes altogether, so that we're not hindered by
 	older, more limited, prototype capabilities of Perl before 5.8.0.

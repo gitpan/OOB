@@ -1,11 +1,11 @@
-package oob;
+package OOB;
 
 # be as strict and verbose as possible
 use strict;
 use warnings;
 
 # version
-$oob::VERSION = '0.02';
+$OOB::VERSION = '0.03';
 
 # modules that we need
 use Carp qw( croak );
@@ -14,9 +14,9 @@ use Scalar::Util qw( blessed refaddr reftype );
 # what we may axport
 my %export_ok;
 @export_ok{ qw(
-  oob_get
-  oob_reset
-  oob_set
+  OOB_get
+  OOB_reset
+  OOB_set
 ) } = ();
 
 # the actual out-of-bounds data
@@ -31,7 +31,7 @@ BEGIN {
     my $debug = 0 + ( $ENV{OOB_DEBUG} || 0 );
     eval "sub DEBUG () { $debug }";
 
-    # create oob::dump
+    # create OOB::dump
     no warnings 'once';
     *dump = sub {
         require Data::Dumper;
@@ -46,7 +46,7 @@ BEGIN {
 END {
     if (DEBUG) {
         require Data::Dumper;
-        print STDERR "Final state of oob data:\n";
+        print STDERR "Final state of OOB data:\n";
         print STDERR Data::Dumper::Dumper( \%data );
     }
 }
@@ -59,20 +59,20 @@ END {
 # Functional Interface
 #
 #-------------------------------------------------------------------------------
-# oob_get
+# OOB_get
 #
 #  IN: 1 reference to value
 #      2 key to fetch
 #      3 package in which key lives (optional)
 # OUT: 1 value or undef
 
-sub oob_get (\[$@%&*]$@) {
+sub OOB_get (\[$@%&*]$@) {
 
     # we're debugging
     if ( DEBUG > 1 ) {
         my $id  = _unique_id( $_[0] );
         my $key = _generate_key( $_[1], $_[2] );
-        print STDERR "oob_get with @_: $id -> $key\n";
+        print STDERR "OOB_get with @_: $id -> $key\n";
     }
 
     # return value without autovivifying
@@ -81,28 +81,28 @@ sub oob_get (\[$@%&*]$@) {
     }
 
     return;
-}    #oob_get
+}    #OOB_get
 
 #-------------------------------------------------------------------------------
-# oob_reset
+# OOB_reset
 #
 #  IN: 1 reference to value
 #      2 package in which key lives (optional)
 # OUT: 1 hash ref with all values
 
-sub oob_reset (\[$@%&*]@) {
+sub OOB_reset (\[$@%&*]@) {
 
     # we're debugging
     if ( DEBUG > 1 ) {
         my $id  = _unique_id( $_[0] );
-        print STDERR "oob_reset with @_: $id\n";
+        print STDERR "OOB_reset with @_: $id\n";
     }
 
     return delete $data{ _unique_id( $_[0] ) };
-}    #oob_reset
+}    #OOB_reset
 
 #-------------------------------------------------------------------------------
-# oob_set
+# OOB_set
 #
 #  IN: 1 reference to value
 #      2 key to set
@@ -110,7 +110,7 @@ sub oob_reset (\[$@%&*]@) {
 #      4 package in which key lives (optional)
 # OUT: 1 any old value
 
-sub oob_set (\[$@%&*]$$@) {
+sub OOB_set (\[$@%&*]$$@) {
 
     # scalar specified
     if ( !reftype $_[0] ) {
@@ -151,7 +151,7 @@ TEXT
     if (DEBUG) {
         my $id  = _unique_id( $_[0] );
         my $key = _generate_key( $_[1], $_[3] );
-        print STDERR "oob_set with @_: $id -> $key\n";
+        print STDERR "OOB_set with @_: $id -> $key\n";
     }
 
     # want to know old value
@@ -167,7 +167,7 @@ TEXT
     $data{ _unique_id( $_[0] ) }->{ _generate_key( $_[1], $_[3] ) } = $_[2];
 
     return;
-}    #oob_set
+}    #OOB_set
 
 #-------------------------------------------------------------------------------
 #
@@ -224,29 +224,29 @@ sub import {
 sub AUTOLOAD {
 
     # attempting to call debug when not debugging
-    return if $oob::AUTOLOAD eq 'oob::dump';
+    return if $OOB::AUTOLOAD eq 'OOB::dump';
     
     # don't know what to do with it
     my $class = shift;
-    croak "Undefined subroutine $oob::AUTOLOAD" if !$class->isa(__PACKAGE__);
+    croak "Undefined subroutine $OOB::AUTOLOAD" if !$class->isa(__PACKAGE__);
 
     # seems to be an attribute we don't know about
     if ( @_ == 2 ) {
-        $oob::AUTOLOAD =~ m#::(\w+)$#;
-        croak "Attempt to set unregistered oob attribute '$1'";
+        $OOB::AUTOLOAD =~ m#::(\w+)$#;
+        croak "Attempt to set unregistered OOB attribute '$1'";
     }
 
     # registration
     elsif ( !@_ ) {
-        my ( $namespace, $key ) = split '::', $oob::AUTOLOAD;
+        my ( $namespace, $key ) = split '::', $OOB::AUTOLOAD;
 
         # install a method to handle it
         no strict 'refs';
-        *$oob::AUTOLOAD = sub {
+        *$OOB::AUTOLOAD = sub {
             return if @_ < 2; # another registration and huh?
             return @_ == 3
-             ? oob_set( $_[1], $key => $_[2], $namespace )
-             : oob_get( $_[1], $key, $namespace );
+             ? OOB_set( $_[1], $key => $_[2], $namespace )
+             : OOB_get( $_[1], $key, $namespace );
         };
     }
 
@@ -263,7 +263,7 @@ sub DESTROY {
     # we're debugging
     if (DEBUG) {
         my $id  = _unique_id( $_[0] );
-        print STDERR "oob::DESTROY with @_: $id\n";
+        print STDERR "OOB::DESTROY with @_: $id\n";
     }
 
     return delete $data{ _unique_id( $_[0] ) };
@@ -326,26 +326,26 @@ __END__
 
 =head1 NAME
 
-oob - out of bounds data for any data structure in Perl
+OOB - out of bounds data for any data structure in Perl
 
 =head1 VERSION
 
-This documentation describes version 0.02.
+This documentation describes version 0.03.
 
 =head1 SYNOPSIS
 
  # object oriented interface
- use oob;
+ use OOB;
 
  # register attributes
- oob->ContentType;
- oob->EpochStart;
- oob->Currency;
- oob->Accept;
+ OOB->ContentType;
+ OOB->EpochStart;
+ OOB->Currency;
+ OOB->Accept;
 
  # scalars (or scalar refs)
- oob->ContentType( $message, 'text/html' );
- my $type = oob->ContentType($message);
+ OOB->ContentType( $message, 'text/html' );
+ my $type = OOB->ContentType($message);
  print <<"MAIL";
  Content-Type: $type
 
@@ -353,29 +353,29 @@ This documentation describes version 0.02.
  MAIL
 
  # arrays
- oob->EpochStart( \@years, 1970 );
- my $offset = oob->EpochStart( \@years );
+ OOB->EpochStart( \@years, 1970 );
+ my $offset = OOB->EpochStart( \@years );
  print $offset + $_ , $/ foreach @years;
 
  # hashes
- oob->Currency( \%salary, 'EUR' );
- my $currency = oob->Currency( \%salary );
+ OOB->Currency( \%salary, 'EUR' );
+ my $currency = OOB->Currency( \%salary );
  print "$_: $salary{$_} $currency\n" foreach sort keys %salary;
 
  # subroutines
- oob->Accept( \&frobnicate, \@classes );
- my $classes = oob->Accept( \&frobnicate );
+ OOB->Accept( \&frobnicate, \@classes );
+ my $classes = OOB->Accept( \&frobnicate );
 
  # functional interface
- use oob qw( oob_set oob_get oob_reset );
+ use OOB qw( OOB_set OOB_get OOB_reset );
 
  package Foo;
- oob_set( $scalar, key => $value );
- my $value = oob_get( @array, 'key' );
- oob_reset( %hash );
+ OOB_set( $scalar, key => $value );
+ my $value = OOB_get( @array, 'key' );
+ OOB_reset( %hash );
 
  package Bar;
- my $value = oob_get( $arrayref, 'key', 'Foo' ); # other module's namespace
+ my $value = OOB_get( $arrayref, 'key', 'Foo' ); # other module's namespace
 
 =head1 DESCRIPTION
 
@@ -392,20 +392,20 @@ it.  Attempting to access any non-existing meta-data attributes will B<not>
 result in an error, but simply return undef.
 
 Registration of an attribute is simple: just calling it as a class method on
-the C<oob> module is enough:
+the C<OOB> module is enough:
 
- use oob;
- oob->ContentType;
+ use OOB;
+ OOB->ContentType;
 
 After that, you can use that attribute on any Perl data structure:
 
- oob->ContentType( $string,  'text/html' ); # scalars don't need to be ref'ed
- oob->ContentType( \$string, 'text/html' ); # same as above
- oob->ContentType( \@array,  'text/html' );
- oob->ContentType( \%hash,   'text/html' );
- oob->ContentType( \&sub,    'text/html' );
- oob->ContentType( *FILE,    'text/html' ); # globs
- oob->ContentType( $handle,  'text/html' ); # blessed objects
+ OOB->ContentType( $string,  'text/html' ); # scalars don't need to be ref'ed
+ OOB->ContentType( \$string, 'text/html' ); # same as above
+ OOB->ContentType( \@array,  'text/html' );
+ OOB->ContentType( \%hash,   'text/html' );
+ OOB->ContentType( \&sub,    'text/html' );
+ OOB->ContentType( *FILE,    'text/html' ); # globs
+ OOB->ContentType( $handle,  'text/html' ); # blessed objects
 
 =head2 Functional Interface
 
@@ -415,33 +415,33 @@ type.  It basically allows you to specify arrays, hashes and subs directly
 principle limited to the namespace from which it is being called, but can
 be overridden if necessary.
 
- use oob qw( oob_set oob_get oob_reset ); # nothing exported by default
+ use OOB qw( OOB_set OOB_get OOB_reset ); # nothing exported by default
 
  package Foo;
- oob_set( $string, ContentType => 'html' );
- my $type = oob_get( $string, 'ContentType' );        # attribute in 'Foo'
+ OOB_set( $string, ContentType => 'html' );
+ my $type = OOB_get( $string, 'ContentType' );        # attribute in 'Foo'
 
  package Bar;
- my $type = oob_get( $string, ContentType => 'Foo' ); # other namespace
- oob_set( $string, ContentType => "text/$type" );     # attribute in "Bar"
+ my $type = OOB_get( $string, ContentType => 'Foo' ); # other namespace
+ OOB_set( $string, ContentType => "text/$type" );     # attribute in "Bar"
 
- oob_set( $string, ContentType => 'text/html' ); # equivalent to object
- oob_set( @array,  ContentType => 'text/html' ); # oriented examples, but
- oob_set( %hash,   ContentType => 'text/html' ); # limited to the current
- oob_set( &sub,    ContentType => 'text/html' ); # namespace
- oob_set( *FILE,   ContentType => 'text/html' );
- oob_set( $handle, ContentType => 'text/html' );
+ OOB_set( $string, ContentType => 'text/html' ); # equivalent to object
+ OOB_set( @array,  ContentType => 'text/html' ); # oriented examples, but
+ OOB_set( %hash,   ContentType => 'text/html' ); # limited to the current
+ OOB_set( &sub,    ContentType => 'text/html' ); # namespace
+ OOB_set( *FILE,   ContentType => 'text/html' );
+ OOB_set( $handle, ContentType => 'text/html' );
 
 =head1 THEORY OF OPERATION
 
-The functional interface of the C<oob> pragma basically uses the C<refaddr>
+The functional interface of the C<OOB> pragma basically uses the C<refaddr>
 of the given value as an internal key to create an "inside-out" hash ref with
 the given keys and values.  If the value is not blessed yet, it will be
-blessed in the C<oob> class, so that it can perform cleanup operations once
+blessed in the C<OOB> class, so that it can perform cleanup operations once
 the value goes out of scope.
 
 If a blessed value is specified, the DESTROY method of the class of the
-object is stolen, so that C<oob> can perform its cleanup after the original
+object is stolen, so that C<OOB> can perform its cleanup after the original
 DESTROY method was called.  This is only supported if the L<Sub::Identify>
 module is also installed.  If that module cannot be found, a warning will
 be issued once to indicate that no cleanup can be performed for blessed
@@ -449,13 +449,13 @@ objects, and execution will then continue as normal.
 
 To prevent clashes between different modules use of the out-of-bounds data,
 the package name of the caller is automatically added to any key specified,
-thereby giving each package its own namespace in the C<oob> environment.
+thereby giving each package its own namespace in the C<OOB> environment.
 However, if need be, a module can access data from another package by the
 additional specification of its namespace.
 
 The object oriented interface is really nothing more than synctactic sugar
 on top of the functional interface.  The namespace that is being used by all
-of the attributes specified with the object oriented interface is the C<oob>
+of the attributes specified with the object oriented interface is the C<OOB>
 package itself.
 
 =head1 REQUIRED MODULES

@@ -9,9 +9,9 @@ use Test::More tests => 2;
 use strict;
 use warnings;
 
-use_ok( 'oob' ); # just for the record
-can_ok( 'oob',qw(
- oob_get
- oob_set
- oob_reset
+use_ok( 'OOB' ); # just for the record
+can_ok( 'OOB',qw(
+ OOB_get
+ OOB_set
+ OOB_reset
 ) );

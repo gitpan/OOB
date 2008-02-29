@@ -1,11 +1,11 @@
-README for oob
+README for OOB
 
 This module makes it possible to assign any out of bounds data (attributes)
 to any Perl data structure with both a functional and an object oriented
 interface.
 
 Version:
- 0.02
+ 0.03
 
 Required Modules:
  Scalar::Util (1.14)

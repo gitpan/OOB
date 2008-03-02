@@ -1,15 +1,16 @@
-package OOB;
+package OOB;            # fool various source parsers
+package OOB::function;  # keep OOB namespace as clean as possible
 
 # be as strict and verbose as possible
 use strict;
 use warnings;
 
 # version
-$OOB::VERSION = '0.06';
+$OOB::VERSION = '0.07';
 
 # modules that we need
-use Carp qw( croak );
 use Scalar::Util qw( blessed refaddr reftype );
+use Sub::Identify qw( sub_fullname );
 
 # the actual out-of-band data
 my %data;
@@ -21,19 +22,25 @@ BEGIN {
 
     # we're debugging
     if ($debug) {
-        print STDERR "OOB debugging enabled\n";
+        warn "OOB debugging enabled\n";
 
         # create OOB::dump
         no warnings 'once';
-        *dump = sub {
+        *OOB::dump = sub {
             require Data::Dumper;
             if ( defined wantarray ) {
                 return wantarray ? %data : \%data;
             }
-            print STDERR Data::Dumper::Dumper( \%data );
+            warn Data::Dumper::Dumper( \%data );
         }
     }
+
+    # can't use __PACKAGE__, so we use __OOB__
+    eval "sub __OOB__ () { 'OOB' }";
 }    #BEGIN
+
+# coderefs of stolen DESTROY methods by class
+my %stolen = ( __OOB__ . '' => \&DESTROY );
 
 # install cloaking functions
 BEGIN {
@@ -43,21 +50,41 @@ BEGIN {
     *Scalar::Util::blessed = sub ($) {
         my $blessed = blessed $_[0];
         return if !$blessed;
-        return $blessed->isa(__PACKAGE__) ? undef : $blessed;
+        return $blessed->isa(__OOB__) ? undef : $blessed;
     };
 
     # determine whether someone else already stole ref()
-    my $old = \&CORE::GLOBAL::ref;
-    eval {$old->()};
-    $old = undef if $@ =~ m#CORE::GLOBAL::ref#;
-    print STDERR "CORE::ref function was already stolen\n"
-      if DEBUG and $old;
+    my $old_ref = \&CORE::GLOBAL::ref;
+    eval { $old_ref->() };
+    $old_ref = undef if $@ =~ m#CORE::GLOBAL::ref#;
+    warn "CORE::ref function was already stolen\n"
+      if DEBUG and $old_ref;
 
     # cloak ourselves from "ref"
     *CORE::GLOBAL::ref = sub {
         my $blessed = blessed $_[0];
-        return reftype $_[0] if $blessed and $blessed->isa(__PACKAGE__);
-        return $old ? $old->( $_[0] ) : CORE::ref $_[0];
+        return reftype $_[0] if $blessed and $blessed->isa(__OOB__);
+        return $old_ref ? $old_ref->( $_[0] ) : CORE::ref $_[0];
+    };
+
+    # determine whether someone else already stole blessed()
+    my $old_bless = \&CORE::GLOBAL::blessed;
+    eval { $old_bless->() };
+    $old_bless = undef if $@ =~ m#CORE::GLOBAL::bless#;
+    warn "CORE::bless function was already stolen\n"
+      if DEBUG and $old_bless;
+
+    # make sure reblessing OOB objects does the right thing
+    *CORE::GLOBAL::bless = sub {
+        my $blessed = blessed $_[0];
+        my $class   = $_[1] || caller();
+
+        # make sure we can DESTROY if a new class
+        _register_DESTROY($class) if $blessed and $stolen{$blessed};
+
+        return $old_bless
+          ? $old_bless->( $_[0], $class )
+          : CORE::bless $_[0], $class;
     };
 }    #BEGIN
 
@@ -69,16 +96,12 @@ my %export_ok;
   OOB_set
 ) } = ();
 
-# coderefs of stolen DESTROY methods by class
-my $can_identify;
-my %stolen = ( __PACKAGE__ . '' => \&DESTROY );
-
 # enable final debugger if necessary
 END {
     if (DEBUG) {
         require Data::Dumper;
-        print STDERR "Final state of OOB data:\n";
-        print STDERR Data::Dumper::Dumper( \%data );
+        warn "Final state of OOB data:\n";
+        warn Data::Dumper::Dumper( \%data );
     }
 }
 
@@ -103,7 +126,7 @@ sub OOB_get {
     if ( DEBUG > 1 ) {
         my $id  = _unique_id( $_[0] );
         my $key = _generate_key( $_[1], $_[2] );
-        print STDERR "OOB_get with @_: $id -> $key\n";
+        warn "OOB_get with @_: $id -> $key\n";
     }
 
     # return value without autovivifying
@@ -126,7 +149,7 @@ sub OOB_reset {
     # we're debugging
     if ( DEBUG > 1 ) {
         my $id  = _unique_id( $_[0] );
-        print STDERR "OOB_reset with @_: $id\n";
+        warn "OOB_reset with @_: $id\n";
     }
 
     return delete $data{ _unique_id( $_[0] ) };
@@ -145,54 +168,24 @@ sub OOB_set {
 
     # scalar specified
     if ( !reftype $_[0] ) {
-        bless \$_[0], __PACKAGE__;
+        CORE::bless \$_[0], __OOB__;
     }
 
     # already blessed and not seen before
     elsif ( my $blessed = blessed $_[0] ) {
-        if ( !$stolen{$blessed} ) {
-
-            # didn't try to load Sub::Identify before
-            if ( !defined $can_identify ) {
-
-                # cannot perform cleanup on blessed objects
-                $can_identify = eval { require Sub::Identify; 1 } || 0;
-                die <<'TEXT' if !$can_identify; # maybe warn better?
-Cannot perform cleanup on meta-data of blessed objects
-because the Sub::Identify module is not installed.
-TEXT
-            }
-
-            # remember current DESTROY logic and put in our own in there
-            if ($can_identify) {
-                my $destroy = $stolen{$blessed} = $blessed->can('DESTROY');
-
-                # there is a DESTROY method, need to insert ours
-                if ($destroy) {
-                    my $fullname = Sub::Identify::sub_fullname($destroy);
-                    no strict 'refs';
-                    *$fullname = sub { $destroy->( $_[0] ); &DESTROY( $_[0] ) };
-                }
-
-                # no DESTROY method yet, to set one
-                else {
-                    no strict 'refs';
-                    *{ $blessed . '::DESTROY' } = $stolen{$blessed} = \&DESTROY;
-                }
-            }
-        }
+        _register_DESTROY($blessed);
     }
 
     # not blessed yet, so bless it now
     else {
-        bless $_[0], __PACKAGE__;
+        CORE::bless $_[0], __OOB__;
     }
 
     # we're debugging
     if (DEBUG) {
         my $id  = _unique_id( $_[0] );
         my $key = _generate_key( $_[1], $_[3] );
-        print STDERR "OOB_set with @_: $id -> $key\n";
+        warn "OOB_set with @_: $id -> $key\n";
     }
 
     # want to know old value
@@ -222,7 +215,7 @@ TEXT
 #  IN: 1 class (ignored)
 #      2..N constants to be exported / attributes to be defined
 
-sub import {
+sub OOB::import {
     my $class = shift;
 
     # nothing to export / defined
@@ -237,24 +230,26 @@ sub import {
 
     # assume none exportables are attributes
     elsif ( my @attributes = grep { !exists $export_ok{$_} } @_ ) {
-        _register( $class, $_ ) foreach @attributes;
+        _register_attribute( $class, $_ ) foreach @attributes;
 
         # reduce to real exportables
         @_ = grep { exists $export_ok{$_} } @_;
     }
 
-    # determine namespace to export to
-    my $namespace = caller() . '::';
+    # something to export
+    if (@_) {
 
-    # we're debugging
-    print STDERR "Exporting @_ to $namespace\n" if DEBUG;
+        # determine namespace to export to
+        my $namespace = caller() . '::';
+        warn "Exporting @_ to $namespace\n" if DEBUG;
 
-    # export requested constants
-    no strict 'refs';
-    *{$namespace.$_} = \&$_ foreach @_;
+        # export requested constants
+        no strict 'refs';
+        *{$namespace.$_} = \&$_ foreach @_;
+    }
 
     return;
-}    #import
+}    #OOB::import
 
 #-------------------------------------------------------------------------------
 # AUTOLOAD
@@ -265,44 +260,48 @@ sub import {
 #      2 key
 #      3 value to set
 
-sub AUTOLOAD {
+sub OOB::AUTOLOAD {
 
     # attempting to call debug when not debugging
     return if $OOB::AUTOLOAD eq 'OOB::dump';
     
     # don't know what to do with it
     my $class = shift;
-    croak "Undefined subroutine $OOB::AUTOLOAD" if !$class->isa(__PACKAGE__);
+    if ( !$class->isa(__OOB__) ) {
+        require Carp;
+        Carp::croak "Undefined subroutine $OOB::AUTOLOAD";
+    }
 
     # seems to be an attribute we don't know about
     if ( @_ == 2 ) {
+        require Carp;
         $OOB::AUTOLOAD =~ m#::(\w+)$#;
-        croak "Attempt to set unregistered OOB attribute '$1'";
+        Carp::croak "Attempt to set unregistered OOB attribute '$1'";
     }
 
     # registration
     elsif ( !@_ ) {
-        _register( $OOB::AUTOLOAD =~ m#^(.*)::(\w+)$# );
+        _register_attribute( $OOB::AUTOLOAD =~ m#^(.*)::(\w+)$# );
     }
 
     return;
-}    #AUTOLOAD
+}    #OOB::AUTOLOAD
 
 #-------------------------------------------------------------------------------
 # DESTROY
 #
 #  IN: 1 instantiated object
 
-sub DESTROY {
+sub OOB::DESTROY {
 
     # we're debugging
     if (DEBUG) {
         my $id  = _unique_id( $_[0] );
-        print STDERR "OOB::DESTROY with @_: $id\n";
+        warn "OOB::DESTROY with @_: $id\n";
     }
 
     return delete $data{ _unique_id( $_[0] ) };
-}    #DESTROY
+}    #OOB::DESTROY
     
 #-------------------------------------------------------------------------------
 #
@@ -328,14 +327,14 @@ sub _generate_key {
 }    #_generate_key
 
 #-------------------------------------------------------------------------------
-# _register
+# _register_attribute
 #
 # Register a new class method
 #
 #  IN: 1 namespace
 #      2 key
 
-sub _register {
+sub _register_attribute {
     my ( $namespace, $key ) = @_;
 
     # install a method to handle it
@@ -346,7 +345,33 @@ sub _register {
          ? OOB_set( $_[1], $key => $_[2], $namespace )
          : OOB_get( $_[1], $key, $namespace );
     };
-}    #_register
+}    #_register_attribute
+
+#-------------------------------------------------------------------------------
+# _register_DESTROY
+#
+#  IN: 1 class to register DESTROY method for
+
+sub _register_DESTROY {
+    my $blessed = shift;
+
+    # already has DESTROY method installed
+    return if $stolen{$blessed};
+
+    # there is a DESTROY method, need to insert ours
+    if ( my $destroy = $blessed->can('DESTROY') ) {
+        $stolen{$blessed} = $destroy;
+        my $fullname = sub_fullname($destroy);
+        no strict 'refs';
+        *$fullname = sub { $destroy->( $_[0] ); &OOB::DESTROY( $_[0] ) };
+    }
+
+    # no DESTROY method yet, to set one
+    else {
+        no strict 'refs';
+        *{ $blessed . '::DESTROY' } = $stolen{$blessed} = \&OOB::DESTROY;
+    }
+}     #_register_DESTROY
 
 #-------------------------------------------------------------------------------
 # _unique_id
@@ -386,7 +411,7 @@ OOB - out of band data for any data structure in Perl
 
 =head1 VERSION
 
-This documentation describes version 0.06.
+This documentation describes version 0.07.
 
 =head1 SYNOPSIS
 
@@ -532,6 +557,27 @@ To hide the fact that Perl data structures have suddenly become blessed,
 the C<OOB> module cloaks itself from being seen by L<Scalar::Util>'s
 C<blessed> function, as well as the core C<ref> function.
 
+=head1 CAVEATS
+
+=head2 Cloaking
+
+The fact that the C<OOB> module is wrapping the core functions C<ref()> and
+blessed(), may produce unexpected results when the C<OOB> module is loaded
+late.  Only code that gets compiled B<after> the C<OOB> module has been
+loaded, will properly cloak the fact that C<OOB> has blessed the data structure
+being tested with C<ref()>.  A similar issue exists with re-blessing objects
+and the wrapping of the core function C<blessed>  It may therefore be advisable
+set the PERL5OPT environment variable to include loading of the C<OOB> module
+as the very first thing to load.  The can be e.g.  be done by prefixing:
+
+ PERL5OPT=-MOOB
+
+to the call to your script, or to add a:
+
+ use OOB;
+
+to the startup Perl script in a mod_perl environment.
+
 =head1 REQUIRED MODULES
 
  Scalar::Util (1.14)
@@ -551,6 +597,9 @@ can use B<any> reference to that data structure to find out its blessedness.
 
 Dave Rolsky for pointing out I meant "out-of-band" data, rather than
 "out-of-bounds".  Oops!
+
+Johan Lodin for pointing out potential problems with ref() and late loading of
+the C<OOB> module.
 
 =head1 COPYRIGHT
 

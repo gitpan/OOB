@@ -51,7 +51,7 @@ foreach my $class ( '', 'Foo' ) {
 
         is( $real_ref, CORE::ref( $ref ),
           'Same as CORE ref' );
-        is( $real_blessed, OOB::blessed( $ref ),
+        is( $real_blessed, OOB::function::blessed( $ref ),
           'Same as CORE blessed' );
 
         OOB->Attribute( $ref, 'Foo' );

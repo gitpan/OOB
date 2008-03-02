@@ -37,7 +37,7 @@ foreach my $class ( '', 'Foo' ) {
       eval "sub { 1 }",
       \*FILE,
       ) {
-      SKIP: { skip "Can't bless non-references", 5
+      SKIP: { skip "Can only bless references", 5
           if $class and !ref $ref;
         $ref = bless $ref, $class if $class;
 

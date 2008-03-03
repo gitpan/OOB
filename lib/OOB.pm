@@ -6,7 +6,7 @@ use strict;
 use warnings;
 
 # version
-$OOB::VERSION = '0.07';
+$OOB::VERSION = '0.08';
 
 # modules that we need
 use Scalar::Util qw( blessed refaddr reftype );
@@ -269,14 +269,14 @@ sub OOB::AUTOLOAD {
     my $class = shift;
     if ( !$class->isa(__OOB__) ) {
         require Carp;
-        Carp::croak "Undefined subroutine $OOB::AUTOLOAD";
+        Carp::croak( "Undefined subroutine $OOB::AUTOLOAD" );
     }
 
     # seems to be an attribute we don't know about
     if ( @_ == 2 ) {
         require Carp;
         $OOB::AUTOLOAD =~ m#::(\w+)$#;
-        Carp::croak "Attempt to set unregistered OOB attribute '$1'";
+        Carp::croak( "Attempt to set unregistered OOB attribute '$1'" );
     }
 
     # registration
@@ -411,7 +411,7 @@ OOB - out of band data for any data structure in Perl
 
 =head1 VERSION
 
-This documentation describes version 0.07.
+This documentation describes version 0.08.
 
 =head1 SYNOPSIS
 

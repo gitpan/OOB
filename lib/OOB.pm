@@ -6,7 +6,7 @@ use strict;
 use warnings;
 
 # version
-$OOB::VERSION = '0.08';
+$OOB::VERSION = '0.09';
 
 # modules that we need
 use Scalar::Util qw( blessed refaddr reftype );
@@ -182,7 +182,7 @@ sub OOB_set {
     }
 
     # we're debugging
-    if (DEBUG) {
+    if ( DEBUG > 1 ) {
         my $id  = _unique_id( $_[0] );
         my $key = _generate_key( $_[1], $_[3] );
         warn "OOB_set with @_: $id -> $key\n";
@@ -411,7 +411,7 @@ OOB - out of band data for any data structure in Perl
 
 =head1 VERSION
 
-This documentation describes version 0.08.
+This documentation describes version 0.09.
 
 =head1 SYNOPSIS
 

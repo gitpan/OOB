@@ -6,7 +6,7 @@ use strict;
 use warnings;
 
 # version
-$OOB::VERSION = '0.09';
+$OOB::VERSION = '0.10';
 
 # modules that we need
 use Scalar::Util qw( blessed refaddr reftype );
@@ -68,7 +68,7 @@ BEGIN {
     };
 
     # determine whether someone else already stole blessed()
-    my $old_bless = \&CORE::GLOBAL::blessed;
+    my $old_bless = \&CORE::GLOBAL::bless;
     eval { $old_bless->() };
     $old_bless = undef if $@ =~ m#CORE::GLOBAL::bless#;
     warn "CORE::bless function was already stolen\n"
@@ -411,7 +411,7 @@ OOB - out of band data for any data structure in Perl
 
 =head1 VERSION
 
-This documentation describes version 0.09.
+This documentation describes version 0.10.
 
 =head1 SYNOPSIS
 

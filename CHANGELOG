@@ -1,3 +1,9 @@
+0.11	5 March 2008
+	Minimal Perl version now 5.005 (as we use Test::More, we cannot support
+	before that).  Also removes "use warnings" when installing on perls
+	before 5.6, and installs on later versions if they were removed.
+	Fixed last "out of bounds" in the Makefile.
+
 0.10	5 March 2008
 	Fixed typo in the CORE::bless stealing code.  Spotted while showing
 	code at the Amsterdam PM meeting.

@@ -1,3 +1,12 @@
+0.12	31 March 2012
+	Checked that it runs with 5.14.2.
+
+	8 April 2008
+	Some pod fixes and clarifications.
+
+	Changed internal storage to improve efficiency: values are more likely
+	to be stored by namespace, rather than by value.
+
 0.11	5 March 2008
 	Minimal Perl version now 5.005 (as we use Test::More, we cannot support
 	before that).  Also removes "use warnings" when installing on perls

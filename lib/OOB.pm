@@ -6,7 +6,7 @@ use strict;
 use warnings;
 
 # version
-$OOB::VERSION = '0.11';
+$OOB::VERSION = '0.12';
 
 # modules that we need
 use Scalar::Util qw( blessed refaddr reftype );
@@ -130,8 +130,8 @@ sub OOB_get {
     }
 
     # return value without autovivifying
-    if ( my $values = $data{ _unique_id( $_[0] ) } ) {
-        return $values->{ _generate_key( $_[1], $_[2] ) };
+    if ( my $values = $data{ _generate_key( $_[1], $_[2] ) } ) {
+        return $values->{ _unique_id( $_[0] ) };
     }
 
     return;
@@ -152,7 +152,22 @@ sub OOB_reset {
         warn "OOB_reset with @_: $id\n";
     }
 
-    return delete $data{ _unique_id( $_[0] ) };
+    # which values to remove?
+    my $id = _unique_id( $_[0] );
+
+    # need to tell the world what we removed
+    if ( defined wantarray ) {
+        my %removed =
+          map  { $_ => delete $data{$_}->{$id} }
+          grep { exists $data{$_}->{$id} }
+          keys %data;
+          return \%removed;
+    }
+
+    # no need to tell what we deleted
+    delete $_->{$id} foreach values %data;
+
+    return;
 }    #OOB_reset
 
 #-------------------------------------------------------------------------------
@@ -163,6 +178,7 @@ sub OOB_reset {
 #      3 value to set
 #      4 package in which key lives (optional)
 # OUT: 1 any old value
+#      2 id of value (optional, refaddr derived)
 
 sub OOB_set {
 
@@ -192,13 +208,13 @@ sub OOB_set {
     if ( defined wantarray ) {
         my $id  = _unique_id( $_[0] );
         my $key = _generate_key( $_[1], $_[3] );
-        my $old = $data{$id}->{$key};
-        $data{$id}->{$key} = $_[2];
-        return $old;
+        my $old = $data{$key}->{$id};
+        $data{$key}->{$id} = $_[2];
+        return wantarray ? ( $old, $id ) : $old;
     }
 
     # just set it
-    $data{ _unique_id( $_[0] ) }->{ _generate_key( $_[1], $_[3] ) } = $_[2];
+    $data{ _generate_key( $_[1], $_[3] ) }->{ _unique_id( $_[0] ) } = $_[2];
 
     return;
 }    #OOB_set
@@ -294,13 +310,18 @@ sub OOB::AUTOLOAD {
 
 sub OOB::DESTROY {
 
+    # what is the id?
+    my $id  = _unique_id( $_[0] );
+
     # we're debugging
     if (DEBUG) {
-        my $id  = _unique_id( $_[0] );
         warn "OOB::DESTROY with @_: $id\n";
     }
 
-    return delete $data{ _unique_id( $_[0] ) };
+    # perform the deletion
+    delete $_->{$id} foreach values %data;
+
+    return;
 }    #OOB::DESTROY
     
 #-------------------------------------------------------------------------------
@@ -411,7 +432,7 @@ OOB - out of band data for any data structure in Perl
 
 =head1 VERSION
 
-This documentation describes version 0.11.
+This documentation describes version 0.12.
 
 =head1 SYNOPSIS
 
@@ -505,7 +526,7 @@ After that, you can use that attribute on any Perl data structure:
 =head2 Functional Interface
 
 The functional interface gives more flexibility but may not be as easy to
-type.  The functional interface binds the given attribut names to thei
+type.  The functional interface binds the given attribut names to the
 namespace from which it is being called (but this can be overridden if
 necessary).
 
@@ -513,10 +534,10 @@ necessary).
 
  package Foo;
  OOB_set( $string, ContentType => 'html' );
- my $type = OOB_get( $string, 'ContentType' );        # attribute in 'Foo'
+ my $type = OOB_get( $string, 'ContentType' );        # same namespace ("Foo")
 
  package Bar;
- my $type = OOB_get( $string, ContentType => 'Foo' ); # other namespace
+ my $type = OOB_get( $string, 'ContentType', 'Foo' ); # other namespace
  OOB_set( $string, ContentType => "text/$type" );     # attribute in "Bar"
 
  OOB_set( $string,  ContentType => 'text/html' ); # scalars don't need refs,
@@ -562,11 +583,11 @@ C<blessed> function, as well as the core C<ref> function.
 =head2 Cloaking
 
 The fact that the C<OOB> module is wrapping the core functions C<ref()> and
-blessed(), may produce unexpected results when the C<OOB> module is loaded
+bless(), may produce unexpected results when the C<OOB> module is loaded
 late.  Only code that gets compiled B<after> the C<OOB> module has been
 loaded, will properly cloak the fact that C<OOB> has blessed the data structure
 being tested with C<ref()>.  A similar issue exists with re-blessing objects
-and the wrapping of the core function C<blessed>  It may therefore be advisable
+and the wrapping of the core function C<bless>.  It may therefore be advisable
 set the PERL5OPT environment variable to include loading of the C<OOB> module
 as the very first thing to load.  The can be e.g.  be done by prefixing:
 
@@ -577,6 +598,11 @@ to the call to your script, or to add a:
  use OOB;
 
 to the startup Perl script in a mod_perl environment.
+
+Unfortunately, any XS code accessing the builtin C<ref> and C<bless> core
+functions directly, will bypass the cloaking mechanism and therefore report
+unblessed data structures as being blessed in the C<OOB> class (or a sub class
+of that).
 
 =head1 REQUIRED MODULES
 

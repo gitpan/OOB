@@ -42,4 +42,5 @@ my $value = int rand 1000;
     ok( !defined OOB->Attribute( \$foo ), 'check new foo not set' );
 }
 
-is( scalar keys %{ OOB::dump() }, 0, "cleanup correct" );
+is( scalar( map { keys %{$_} } values %{ OOB::dump() } ), 0,
+  "cleanup correct" );
